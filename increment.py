@@ -139,14 +139,6 @@ class Increment(object):
 		(making it two groups). Therefore if you are calling this inside of a
 		transaction you will need to do a cross-group transaction.
 
-		Testing
-		=======
-		As of now this library has been *lightly* tested and has not been tested
-		at a high load.  For a test of "eventually sequential" see the results
-		here (http://pastebin.com/p8cMSpzy).  This is a test where random calls
-		were made and the results show how all of lower numbers are sequential
-		while the highest ones have gaps.
-
 		Limitations
 		===========
 		 - Only one request per transaction.

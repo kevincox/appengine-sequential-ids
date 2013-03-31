@@ -1,0 +1,11 @@
+application: appengine-sequential-ids
+version: 1
+runtime: python27
+api_version: 1
+threadsafe: true
+
+handlers:
+- url: /scale
+  script: test_scale.app
+builtins:
+- remote_api: on

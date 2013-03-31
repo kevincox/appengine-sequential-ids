@@ -67,3 +67,19 @@ number of shards as appropriate to relieve this pressure) in which case it
 raises an exception, or if you are out of ids on the master and the shard you
 accessed they return `False` or `(False,False)` (there may still be a couple of
 ids on other shards but this is generally a really bad thing).
+
+
+## Testing
+
+For a test of "eventually sequential" see the results here
+(http://pastebin.com/p8cMSpzy).  This is a test where random calls were made
+and the results show how all of lower numbers are sequential while the
+highest ones have gaps.
+
+I have done a simple benchmark live on app engine and I got about 10qps with
+a chunk size of two and random request size (often requiring a fetch to the
+master) before hitting contention problems.  I then turned the chunk size up
+to 10 and got about 25qps.  This is still quite low as many request required
+a fetch to the master.  When I turned the chunk size to 100 I got up to
+100qps without any signs of contention.  I only stopped here because I ran out
+of free resources.  The benchmark used is contained in `test_scale.py`.
