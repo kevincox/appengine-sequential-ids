@@ -124,9 +124,9 @@ class Increment(object):
 			If you add a large number of shards in proportion to your current
 			number you may get some contention on the master as they fetch their
 			first chunk of ids.  If you are going to double your number of
-			shards you will have half of your request hitting the master for a
-			short while.  If you need to make a dramatic change consider doing
-			it in smaller steps.
+			shards, for example, you will have half of your request hitting the
+			master for a short while.  If you need to make a dramatic change
+			to the number of shards consider doing it in smaller steps.
 
 		To remove a shard you can just decrement the count but you will loose
 		the values in that shard.  For how to return those values see above.
@@ -135,16 +135,9 @@ class Increment(object):
 		============
 		The shards use transactions to update atomically.  If you are in a
 		trasaction it will join it and if you are not it will create one.  Each
-		call will make one group access and possible an access to the root node
+		call will make at least one group access and possibly access the root node
 		(making it two groups). Therefore if you are calling this inside of a
 		transaction you will need to do a cross-group transaction.
-
-		Limitations
-		===========
-		 - Only one request per transaction.
-		 - Fixed id sequence (always going up by ones).  This can be mitigated
-		   by modifing the results (ex: multiply by two for incrementing by 2 or
-		   subtract from a max number to go down).
 	"""
 
 	def __init__(self, name, chunk, shards=None, min=1, max=2**63-1, direct=True):
