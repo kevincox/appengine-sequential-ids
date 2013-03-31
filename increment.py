@@ -91,10 +91,10 @@ class Increment(object):
 		Google App Engine.  It uses shading counters reserving chunks of ids
 		from a master counter.
 
-		The idea is to get sequential ids, but to make it scale atomicaly
+		The idea is to get sequential ids. However, to make it scale, atomic
 		sequential ids can't be used.  Instead ids are reserved from a master
 		in chunks and then served out.  This ensures that you are getting
-		"almost" sequential ids, and that all the ids will be used.
+		"almost" sequential ids, and that all the ids will be used eventually.
 
 		The main design goals of this library were scalability and gap-free ids.
 		This means that performance should scale horizontally with the chunk
@@ -148,8 +148,7 @@ class Increment(object):
 		   subtract from a max number to go down).
 	"""
 
-	def __init__(self, name, chunk=2, shards=None, min=0, max=2**63-1, direct=True):
-		IncrementCounter.get_or_insert(name, cur=min, max=max)
+	def __init__(self, name, chunk=2, shards=None, min=1, max=2**63-1, direct=True):
 		"""
 			Constructor.
 
@@ -204,9 +203,10 @@ class Increment(object):
 					then the chunk size as it defeats the purpose of the
 					sharding.
 		"""
+		root = IncrementCounter.get_or_insert(name, cur=min, max=max)
 
 		self.name = name
-		self.rootkey = db.Key.from_path("IncrementCounter", name)
+		self.rootkey = root.key()
 		self.min = min
 		self.chunk = chunk
 		# Unnecessarily complex guess of how many shards you should have.
