@@ -204,38 +204,86 @@ class Increment(object):
 		root = IncrementCounter.get_or_insert(name, cur=min, max=max)
 
 		self.name = name
+		"""
+			The counter name.  All counters with the same name will use the same
+			pool of IDs.  If this is changed all values from `randomshard()`
+			become invalid and will lead to undefined behaviour if used again.
+		"""
 		self.rootkey = root.key
-		self.min = min
 		self.chunk = chunk
+		"""
+			The chunk size.  This takes affect immediately.  You may wish to
+			raise this value if you know you are going to make many request
+			later but you can't allocate all the IDs up front because you don't
+			know how many you will need.
+		"""
+		self.shards = None
 		# Unnecessarily complex guess of how many shards you should have.
-		self.shards = shards or chunk+int(math.log(chunk)/math.log(2))
+		if chunk:
+			self.shards = shards or chunk+int(math.log(chunk)/math.log(2))
+		else:
+			self.shards = 0
+		"""
+			The number of shards.  This takes affect immediately.  Read the
+			section above about adding or removing shards.
+		"""
 		self.direct = direct
+		"""
+			Whether to allow direct calls to the root node. This takes affect
+			immediately.
+		"""
 
 		#logging.debug("Chunk size: {}".format(self.chunk))
 		#logging.debug("Number of shards: {}".format(self.shards))
 
-	def _rootshard(self):
-		#logging.debug("Dropping to root.")
-		return self.rootkey.get()
+	def randomshard(self):
+		"""
+			Returns a shard name.  This should be treated as opaque and can
+			be passed to the `shard` parameter of the id retrieval functions.
+			This is useful when you want to fetch ids in batches inside a
+			transaction.  If you picked a random shard each time you would
+			access many entity groups but if you use the same shard for all
+			lookups inside a transaction you will access a maximum of two.
 
-	def _randomshardname(self):
+			Returns:
+				(string):
+					The shard name.
+		"""
 		return self.name+"__"+str(random.randint(1,self.shards))
 
-	def _randomshard(self):
-		sn = self._randomshardname()
-		#logging.debug("Using {}".format(sn))
-		s = IncrementCounter.get_or_insert(sn)
-		s.chunk = self.chunk # Let it know our preferences.
+	def _getshard(self, num=0, shard=None, chunk=None):
+		if shard is None:
+			shard = self.randomshard()
+		if chunk is None:
+			chunk = self.chunk
+
+		# Handle direct-to-root.
+		if self.direct and num >= chunk:
+			logging.debug("Using {}".format(self.rootkey.string_id()))
+			return self.rootkey.get()
+
+		# Use a shard.
+		logging.debug("Using {}".format(shard))
+		s = IncrementCounter.get_or_insert(shard)
+		s.chunk = chunk # Let it know our preferences.
 		return s
 
 	@ndb.transactional(propagation=ndb.TransactionOptions.ALLOWED, xg=True)
-	def reserve(self, num):
+	def reserve(self, num, shard=None, chunk=None):
 		"""
 			Reserve a sequence of ids.
 
 			Args:
 				num (int):
 					The largest number of ids to reserve.
+
+			Kwargs:
+				shard (string):
+					A value from `randomshard()`.  Use this shard.
+				chunk (int):
+					The chunk size to use if this call requires a fetch to
+					master.  This also affects making direct calls to the
+					master.
 
 			Returns:
 				(int, int):
@@ -254,15 +302,10 @@ class Increment(object):
 						that the new ids retrieved would be sequential to the
 						shard already has.
 		"""
-		if self.direct and num > self.chunk:
-			s = self._rootshard()
-		else:
-			s = self._randomshard()
-
-		return s.reserve(num)
+		return self._getshard(num=num, shard=shard, chunk=chunk).reserve(num)
 
 	@ndb.transactional(propagation=ndb.TransactionOptions.ALLOWED, xg=True)
-	def next(self, num, guaranteed=True):
+	def next(self, num, guaranteed=True, shard=None, chunk=None):
 		"""
 			Returns a list of ids.
 
@@ -283,6 +326,8 @@ class Increment(object):
 						`True` also may not return the correct number if the
 						master doesn't have enough ids left to complete the
 						request.  This is so that ids aren't lost.
+				shard, chunk:
+					See `reserve()`.
 
 			Returns:
 				list:
@@ -292,17 +337,16 @@ class Increment(object):
 					that the root node has no ids left.
 
 		"""
-		if self.direct and num > self.chunk:
-			s = self._rootshard()
-		else:
-			s = self._randomshard()
-
-		return s.next(num, guaranteed)
+		return self._getshard(num=num, shard=shard, chunk=chunk).next(num, guaranteed)
 
 	@ndb.transactional(propagation=ndb.TransactionOptions.ALLOWED, xg=True)
-	def one(self):
+	def one(self, shard=None, chunk=None):
 		"""
 			Return one id.
+
+			Kwargs:
+				shard, chunk:
+					See `reserve()`.
 
 			Returns:
 				int:
@@ -311,4 +355,30 @@ class Increment(object):
 					False is returned if there are no ids available.  This means
 					that the root node has no ids left.
 		"""
-		return self._randomshard().one()
+		return self._getshard(num=1, shard=shard, chunk=chunk).one()
+
+	@ndb.toplevel
+	def delete(self):
+		"""
+			Deletes all shards and the master associated with this counter.
+
+			All instances using this counter can not be used any more.  If they
+			are recreated they will recreate the counter the same way they would
+			with a never-used-before name.
+
+			You have to be very careful when using this on "live" counters.  You
+			need to first ensure everyone stops accessing the counter and
+			deletes their `Increment` instances.  It is mainly intended for
+			admin action and manual use.
+
+			.. note::
+				Note that this does not take the `shards` value into account, it
+				removes all shards matching the name pattern.
+		"""
+		q = (IncrementCounter.query()
+		       .filter(IncrementCounter.key > ndb.Key(IncrementCounter,self.name+"__"))
+		       .filter(IncrementCounter.key < ndb.Key(IncrementCounter,self.name+"__A"))
+		    )
+
+		self.rootkey.delete_async()
+		ndb.delete_multi(q.iter(keys_only=True))
