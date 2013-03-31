@@ -33,6 +33,11 @@ import logging
 from google.appengine.ext import ndb
 
 logger = logging.getLogger('increment')
+"""
+	Set the logging level.  The defualt only shows major issues such
+	as running out of keys.  INFO prints what each call is doing and
+	debug prints a lot of info.
+"""
 logger.setLevel(logging.WARNING)
 
 class IncrementCounter(ndb.Model):
