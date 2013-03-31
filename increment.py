@@ -148,7 +148,7 @@ class Increment(object):
 		   subtract from a max number to go down).
 	"""
 
-	def __init__(self, name, chunk=2, shards=None, min=1, max=2**63-1, direct=True):
+	def __init__(self, name, chunk, shards=None, min=1, max=2**63-1, direct=True):
 		"""
 			Constructor.
 
@@ -163,11 +163,8 @@ class Increment(object):
 					doesn't contain a double underscore "__".  If a counter for
 					this name doesn't exist it is created, if it already exists
 					it will be used.
-
-			Kwargs:
 				chunk (int):
-					The chunk size, this currently defaults to ``2``, you should
-					probably change that.  This is local to the python object,
+					The chunk fetch size.  This is local to the python object,
 					this means that if a call to this instance requires a fetch
 					from master the shard will reserve this many extra ids.
 
@@ -175,6 +172,8 @@ class Increment(object):
 					means that your ids may be further apart when created.  This
 					value is what controls the load on the master.  If you have
 					contention on the master this should be raised.
+
+			Kwargs:
 				shards (int):
 					The number of shards to use.  By default it is related to
 					the value of `chunk`.  Currently it is `chunk` plus the log
@@ -186,15 +185,15 @@ class Increment(object):
 				min (int):
 					The lowest id to serve.  This only has effect when creating
 					the counter.  If "connecting" to an existing counter it is
-					ignored.
-					raised.
-				min (int):
+					ignored. This defaults to one because that is the lowest
+					key id appengine supports.
+				max (int):
 					The highest id to serve.  This defaults to the largest
 					possible 32-bit integer.  This only has effect when creating
 					the counter.  If "connecting" to an existing counter it is
 					ignored.
 				direct (bool):
-					If set request for more ids then the chunk size are passed
+					If set, request for more ids then the chunk size are passed
 					directly to the master rather then being passed through a
 					slave.  It is recommended to leave this set as you will hit
 					one entity rather than two.  If unset `reserve()` has a
