@@ -30,26 +30,33 @@ import math
 import random
 import logging
 
-from google.appengine.ext import db
+from google.appengine.ext import ndb
 
-class IncrementCounter(db.Model):
-	cur = db.IntegerProperty(indexed=False, default=0)
-	max = db.IntegerProperty(indexed=False, default=0)
+logger = logging.getLogger('increment')
+logger.setLevel(logging.WARNING)
+
+class IncrementCounter(ndb.Model):
+	cur = ndb.IntegerProperty(indexed=False, default=0)
+	max = ndb.IntegerProperty(indexed=False, default=0)
 
 	chunk = 8 # Not stored.
+	_use_memcache = False # Won't do anything.
 
-	readfrommaster = False # Make sure we don't read old data inside a transaction.
-	def _fromparent(self, num):
-		if ( not self.readfrommaster ) and self.parent_key():
-			p = IncrementCounter.get(self.parent_key())
-			self.readfrommaster = True
-			return p.reserve(num)
+	def _fromroot(self, num):
+		global logger
+		logger.info("RAISING TO MASTER!!!")
+		id = self.key.string_id()
+		if "__" in id:
+			return IncrementCounter.get_by_id(self.key.string_id().partition("__")[0]).reserve(num)
 		else:
+			logger.error("Out of ids on master!")
 			return False, False
 
 	def reserve(self, num):
+		global logger
+		logger.debug("{} has {{cur:{},max:{}}}".format(self.key.id(), self.cur, self.max))
 		if self.cur >= self.max:
-			l, h = self._fromparent(num+self.chunk)
+			l, h = self._fromroot(num+self.chunk)
 			if l is False:
 				return False, False
 			self.cur = l
@@ -60,19 +67,17 @@ class IncrementCounter(db.Model):
 		rh = min(self.cur, self.max)          # Actual high value.
 
 		self.put()
+		logger.info("{} reserved {},{}".format(self.key.id(), rl, rh))
 		return rl, rh
 
 	def next(self, num, guaranteed=True):
 		l, h = self.reserve(num)
-		print(l,h)
 		if l is False:
 			return False
 		r = range(l,h)
-		print(r)
 
-		if guaranteed:
+		if guaranteed and len(r) < num:
 			l2, h2 = self.reserve(num-len(r))
-			print(l2,h2)
 			if l2 is False:
 				self.cur = l # Restore old values so we don't loose ids.
 				self.maz = h #
@@ -83,7 +88,6 @@ class IncrementCounter(db.Model):
 
 	def one(self):
 		return self.reserve(1)[0]
-
 
 class Increment(object):
 	"""
@@ -116,21 +120,24 @@ class Increment(object):
 		constructor.  The shard is automatically created the first time it is
 		accessed.
 
+		.. note::
+			If you add a large number of shards in proportion to your current
+			number you may get some contention on the master as they fetch their
+			first chunk of ids.  If you are going to double your number of
+			shards you will have half of your request hitting the master for a
+			short while.  If you need to make a dramatic change consider doing
+			it in smaller steps.
+
 		To remove a shard you can just decrement the count but you will loose
 		the values in that shard.  For how to return those values see above.
 
 		Transactions
 		============
 		The shards use transactions to update atomically.  If you are in a
-		trasaction it will join it and if you are not it will create one.  The
-		library is smart enough not to mess up inside its own transactions but
-		if you are calling it from a transaction you have to ensure you only
-		make one request to any counter (not per-instance, any counter with the
-		same name) or you risk getting the same id multiple times.  This is
-		because we will not read our writes until the trasaction ends and there
-		is no way for us to tell what the state "inside" the transaction result
-		is.  Until App Engine supports `propagation=NESTED` transactions this
-		limitation will persist (and that might not even solve the problem).
+		trasaction it will join it and if you are not it will create one.  Each
+		call will make one group access and possible an access to the root node
+		(making it two groups). Therefore if you are calling this inside of a
+		transaction you will need to do a cross-group transaction.
 
 		Testing
 		=======
@@ -205,7 +212,7 @@ class Increment(object):
 		root = IncrementCounter.get_or_insert(name, cur=min, max=max)
 
 		self.name = name
-		self.rootkey = root.key()
+		self.rootkey = root.key
 		self.min = min
 		self.chunk = chunk
 		# Unnecessarily complex guess of how many shards you should have.
@@ -217,7 +224,7 @@ class Increment(object):
 
 	def _rootshard(self):
 		#logging.debug("Dropping to root.")
-		return IncrementCounter.get(self.rootkey)
+		return self.rootkey.get()
 
 	def _randomshardname(self):
 		return self.name+"__"+str(random.randint(1,self.shards))
@@ -225,15 +232,11 @@ class Increment(object):
 	def _randomshard(self):
 		sn = self._randomshardname()
 		#logging.debug("Using {}".format(sn))
-		s = IncrementCounter.get_by_key_name(sn, parent=self.rootkey)
-
-		if s is None:
-			s = IncrementCounter(key_name=sn, parent=self.rootkey)
-
+		s = IncrementCounter.get_or_insert(sn)
 		s.chunk = self.chunk # Let it know our preferences.
 		return s
 
-	@db.transactional(propagation=db.ALLOWED)
+	@ndb.transactional(propagation=ndb.TransactionOptions.ALLOWED, xg=True)
 	def reserve(self, num):
 		"""
 			Reserve a sequence of ids.
@@ -266,7 +269,7 @@ class Increment(object):
 
 		return s.reserve(num)
 
-	@db.transactional(propagation=db.ALLOWED)
+	@ndb.transactional(propagation=ndb.TransactionOptions.ALLOWED, xg=True)
 	def next(self, num, guaranteed=True):
 		"""
 			Returns a list of ids.
@@ -304,7 +307,7 @@ class Increment(object):
 
 		return s.next(num, guaranteed)
 
-	@db.transactional(propagation=db.ALLOWED)
+	@ndb.transactional(propagation=ndb.TransactionOptions.ALLOWED, xg=True)
 	def one(self):
 		"""
 			Return one id.
