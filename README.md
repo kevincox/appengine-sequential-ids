@@ -19,21 +19,21 @@ useridcounter = increment.Increment("user-id", 10)
 # Retrieving a single id.
 uid = useridcounter.one()
 if uid is False:
-	logging.error("Oh No!  We have run out of keys!")
-	return
-u1 = User(key=db.Key.from_path("User", uid))
+    logging.error("Oh No!  We have run out of keys!")
+    return
+u1 = User(id=uid)
 
 # Now lets make ten users the hard way.
 users1 = []
 while len(users1) < 10:
-	low, high = useridcounter.reserve(10-len(users1))
-	if low is False: # High will also be false on an error, but you only need one.
-		logging.error("Oh No!  We have run out of keys!")
-		return
-	# Note: `high-low` might NOT be 10! (read the docs)
-	while low < high:
-		users1.push(User(key=db.Key.from_path("User", low)))
-		low += 1
+    low, high = useridcounter.reserve(10-len(users1))
+    if low is False: # High will also be false on an error, but you only need one.
+        logging.error("Oh No!  We have run out of keys!")
+        return
+    # Note: `high-low` might NOT be 10! (read the docs)
+    while low < high:
+        users1.push(User(id=low))
+        low += 1
 
 # Create the counter again for completeness.  The min and max values have no
 # affect as the counter has already been created (with the default min and
@@ -46,12 +46,13 @@ useridcounter = increment.Increment("user-id", 12, min=-172, max=500)
 users2 = []
 ids = useridcounter.next(10)
 if ids is False or len(ids) < 10: # Whereas in the hard way getting less then
-	                              # ten is common, this time in only happens
-	                              # if we are out of keys.
-	logging.error("Oh No!  We have run out of keys!")
-	return
+                                  # ten is common, this time in only happens
+                                  # if we are out of keys.
+    logging.error("Oh No!  We have run out of keys!")
+    return
 for id in ids:
-	users2.push(User(key=db.Key.from_path("User", id)))
+    users2.push(User(id=id))
+
 ```
 
 Those are the three ways to get ids.  `.one()` is really easy and likely the
