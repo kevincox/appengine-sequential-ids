@@ -96,7 +96,7 @@ class IncrementCounter(ndb.Model):
 
 class Increment(object):
 	"""
-		A class for getting sequences of "eventually sequential integers on
+		A class for getting sequences of "eventually sequential" integers on
 		Google App Engine.  It uses shading counters reserving chunks of ids
 		from a master counter.
 
@@ -140,9 +140,9 @@ class Increment(object):
 		============
 		The shards use transactions to update atomically.  If you are in a
 		trasaction it will join it and if you are not it will create one.  Each
-		call will make at least one group access and possibly access the root node
-		(making it two groups). Therefore if you are calling this inside of a
-		transaction you will need to do a cross-group transaction.
+		call will make at least one group access and possibly access the root
+		node (making it two groups). Therefore if you are calling this inside of
+		a transaction you will need to do a cross-group transaction.
 	"""
 
 	def __init__(self, name, chunk=0, shards=None, min=1, max=2**63-1, direct=True):
