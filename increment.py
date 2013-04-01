@@ -145,7 +145,7 @@ class Increment(object):
 		transaction you will need to do a cross-group transaction.
 	"""
 
-	def __init__(self, name, chunk, shards=None, min=1, max=2**63-1, direct=True):
+	def __init__(self, name, chunk=0, shards=None, min=1, max=2**63-1, direct=True):
 		"""
 			Constructor.
 
@@ -160,6 +160,13 @@ class Increment(object):
 					doesn't contain a double underscore "__".  If a counter for
 					this name doesn't exist it is created, if it already exists
 					it will be used.
+
+					This defaults to zero so that ``Increment("name").delete()``
+					works.  If you have a chunk size of zero it will effectively
+					disabling batch fetching, defeating the purpose of the
+					counters (expect it because easy to scale later).
+
+			Kwargs:
 				chunk (int):
 					The chunk fetch size.  This is local to the python object,
 					this means that if a call to this instance requires a fetch
@@ -169,8 +176,6 @@ class Increment(object):
 					means that your ids may be further apart when created.  This
 					value is what controls the load on the master.  If you have
 					contention on the master this should be raised.
-
-			Kwargs:
 				shards (int):
 					The number of shards to use.  By default it is related to
 					the value of `chunk`.  Currently it is `chunk` plus the log
@@ -179,6 +184,11 @@ class Increment(object):
 					of ids at the same time they will all go to the master.  If
 					there is contention on the shards this value should be
 					raised.
+
+					If this value is ``0`` the root node will be accessed
+					directly each time.  This may be used for small loads so
+					that you can scale later as you need to.  Note that setting
+					this to ``1`` is just a waste of resources.
 				min (int):
 					The lowest id to serve.  This only has effect when creating
 					the counter.  If "connecting" to an existing counter it is
@@ -215,12 +225,13 @@ class Increment(object):
 			later but you can't allocate all the IDs up front because you don't
 			know how many you will need.
 		"""
-		self.shards = None
+		self.shards = shards
 		# Unnecessarily complex guess of how many shards you should have.
-		if chunk:
-			self.shards = shards or chunk+int(math.log(chunk)/math.log(2))
-		else:
-			self.shards = 0
+		if shards is None:
+			if chunk:
+				self.shards = chunk+int(math.log(chunk)/math.log(2))
+			else:
+				self.shards = 0
 		"""
 			The number of shards.  This takes affect immediately.  Read the
 			section above about adding or removing shards.
@@ -231,8 +242,10 @@ class Increment(object):
 			immediately.
 		"""
 
-		#logging.debug("Chunk size: {}".format(self.chunk))
-		#logging.debug("Number of shards: {}".format(self.shards))
+		logging.info("Counter name: {}".format(self.name))
+		logging.info("Chunk size: {}".format(self.chunk))
+		logging.info("Number of shards: {}".format(self.shards))
+		logging.info("Allow Direct: {}".format(self.direct))
 
 	def randomshard(self):
 		"""
@@ -247,6 +260,9 @@ class Increment(object):
 				(string):
 					The shard name.
 		"""
+		if self.shards <= 0: # No shards, go to root.
+			return self.name
+
 		return self.name+"__"+str(random.randint(1,self.shards))
 
 	def _getshard(self, num=0, shard=None, chunk=None):
@@ -300,6 +316,8 @@ class Increment(object):
 						that the new ids retrieved would be sequential to the
 						shard already has.
 		"""
+		if num <= 0:
+			return 0,0
 		return self._getshard(num=num, shard=shard, chunk=chunk).reserve(num)
 
 	@ndb.transactional(propagation=ndb.TransactionOptions.ALLOWED, xg=True)
@@ -335,6 +353,8 @@ class Increment(object):
 					that the root node has no ids left.
 
 		"""
+		if num <= 0:
+			return []
 		return self._getshard(num=num, shard=shard, chunk=chunk).next(num, guaranteed)
 
 	@ndb.transactional(propagation=ndb.TransactionOptions.ALLOWED, xg=True)
