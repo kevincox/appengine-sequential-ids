@@ -293,7 +293,8 @@ class Increment(object):
 
 			Kwargs:
 				shard (string):
-					A value from `randomshard()`.  Use this shard.
+					A value from `randomshard()`.  Use this shard.  If not provided
+					a random shard is picked for you.
 				chunk (int):
 					The chunk size to use if this call requires a fetch to
 					master.  This also affects making direct calls to the
@@ -301,8 +302,8 @@ class Increment(object):
 
 			Returns:
 				(int, int):
-					Returns lowest, and one past the highest id reserve.  These
-					are such that ``rance(inc.reserve(num))`` would return a
+					Returns lowest, and one past the highest id reserved.  These
+					are such that ``range(inc.reserve(num))`` would return a
 					list of the reserved ids.
 
 				(False, False):
