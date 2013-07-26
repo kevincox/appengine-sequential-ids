@@ -85,7 +85,7 @@ class IncrementCounter(ndb.Model):
 			l2, h2 = self.reserve(num-len(r))
 			if l2 is False:
 				self.cur = l # Restore old values so we don't loose ids.
-				self.maz = h #
+				self.max = h #
 				return False
 			r.extend(range(l2, h2))
 
