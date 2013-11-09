@@ -3,7 +3,7 @@
 A scaleable, sharded apprach to generating sequential IDs on Google App Engine.
 
 Lots of documentation in the source.  Feel free to
-[kevincox.ca@gmail.com](email me) with questions and please submit issues in the
+[email me](kevincox@kevincox.ca) with questions and please submit issues in the
 tracker.
 
 ## Example
@@ -27,7 +27,7 @@ u1 = User(id=uid)
 users1 = []
 while len(users1) < 10:
     low, high = useridcounter.reserve(10-len(users1))
-    if low is False: # High will also be false on an error, but you only need one.
+    if low is False: # High will also be false on an error.
         logging.error("Oh No!  We have run out of keys!")
         return
     # Note: `high-low` might NOT be 10! (read the docs)
@@ -35,9 +35,9 @@ while len(users1) < 10:
         users1.push(User(id=low))
         low += 1
 
-# Create the counter again for completeness.  The min and max values have no
-# affect as the counter has already been created (with the default min and
-# max) at the top of the script (or another time, they are persistant).  Note
+# Create the counter again for the sake of the example.  The min and max values
+# have no affect as the counter has already been created (with the default min
+# and max) at the top of the script (or another time, they are persistant).  Note
 # that all other settings DO take affect.  When a shard is accessed using this
 # object it will use this chunk size (12), NOT one set earlier on.
 useridcounter = increment.Increment("user-id", 12, min=-172, max=500)
@@ -82,5 +82,6 @@ a chunk size of two and random request size (often requiring a fetch to the
 master) before hitting contention problems.  I then turned the chunk size up
 to 10 and got about 25qps.  This is still quite low as many request required
 a fetch to the master.  When I turned the chunk size to 100 I got up to
-100qps without any signs of contention.  I only stopped here because I ran out
-of free resources.  The benchmark used is contained in `test_scale.py`.
+100qps without any signs of contention.  I would expect this trent to
+continue for higher chunk values.  The benchmark used is contained in
+`test_scale.py`.
