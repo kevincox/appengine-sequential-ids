@@ -2,7 +2,7 @@
 
 """
 
-Copyright 2013 Kevin Cox
+Copyright 2013, 2015 Kevin Cox
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to
@@ -164,7 +164,7 @@ class Increment(object):
 					This defaults to zero so that ``Increment("name").delete()``
 					works.  If you have a chunk size of zero it will effectively
 					disabling batch fetching, defeating the purpose of the
-					counters (expect it because easy to scale later).
+					counters (expect that it becomes easy to scale later).
 
 			Kwargs:
 				chunk (int):
