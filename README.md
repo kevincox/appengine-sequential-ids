@@ -82,6 +82,6 @@ a chunk size of two and random request size (often requiring a fetch to the
 master) before hitting contention problems.  I then turned the chunk size up
 to 10 and got about 25qps.  This is still quite low as many request required
 a fetch to the master.  When I turned the chunk size to 100 I got up to
-100qps without any signs of contention.  I would expect this trent to
+100qps without any signs of contention.  I would expect this trend to
 continue for higher chunk values.  The benchmark used is contained in
 `test_scale.py`.
