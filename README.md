@@ -46,7 +46,7 @@ useridcounter = increment.Increment("user-id", 12, min=-172, max=500)
 users2 = []
 ids = useridcounter.next(10)
 if ids is False or len(ids) < 10: # Whereas in the hard way getting less then
-                                  # ten is common, this time in only happens
+                                  # ten is common, this time it only happens
                                   # if we are out of keys.
     logging.error("Oh No!  We have run out of keys!")
     return
