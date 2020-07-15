@@ -161,11 +161,6 @@ class Increment(object):
 					this name doesn't exist it is created, if it already exists
 					it will be used.
 
-					This defaults to zero so that ``Increment("name").delete()``
-					works.  If you have a chunk size of zero it will effectively
-					disabling batch fetching, defeating the purpose of the
-					counters (expect that it becomes easy to scale later).
-
 			Kwargs:
 				chunk (int):
 					The chunk fetch size.  This is local to the python object,
@@ -176,6 +171,11 @@ class Increment(object):
 					means that your ids may be further apart when created.  This
 					value is what controls the load on the master.  If you have
 					contention on the master this should be raised.
+					
+					This defaults to zero so that ``Increment("name").delete()``
+					works.  If you have a chunk size of zero it will effectively
+					disabling batch fetching, defeating the purpose of the
+					counters (expect that it becomes easy to scale later).
 				shards (int):
 					The number of shards to use.  By default it is related to
 					the value of `chunk`.  Currently it is `chunk` plus the log
