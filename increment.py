@@ -196,9 +196,9 @@ class Increment(object):
 					key id appengine supports.
 				max (int):
 					The highest id to serve.  This defaults to the largest
-					possible 32-bit integer.  This only has effect when creating
-					the counter.  If "connecting" to an existing counter it is
-					ignored.
+					possible signed 64-bit integer.  This only has effect when
+					creating the counter.  If "connecting" to an existing
+					counter it is ignored.
 				direct (bool):
 					If set, request for more ids then the chunk size are passed
 					directly to the master rather then being passed through a
